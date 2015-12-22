@@ -1,0 +1,12 @@
+[package]
+name = "web"
+version = "0.1.0"
+authors = ["psychoss <626377748@qq.com>"]
+
+[dependencies]
+hyper="*"
+postgres="*"
+
+[[bin]]
+name = "sever"
+path="src/bin/main.rs"
