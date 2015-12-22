@@ -1,7 +1,7 @@
 extern crate hyper;
-
-pub mod file_server;
+extern crate time;
 pub mod server;
-
-pub use file_server::Static;
+pub mod static_handler;
+//
+// pub useuse sender::Sender;
 pub use server::Flash;
