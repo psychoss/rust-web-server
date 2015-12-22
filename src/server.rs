@@ -14,9 +14,10 @@ use std::env;
 use std::net::{ToSocketAddrs, SocketAddr};
 use std::path::PathBuf;
 use std::time::Duration;
-use url::{Url, ParseError};
 use static_handler::Handler as StaticHandler;
-
+use std::io::Read;
+use std::any::Any;
+use std::marker;
 
 pub struct Flash {
     address: Option<SocketAddr>,
@@ -43,7 +44,7 @@ impl Flash {
             root: root_path,
         }
     }
-    pub fn dispatch(&self, uri: &String, method: &Method, mut res: Response) {
+    pub fn dispatch(&self,  req:&mut Request,uri: &String, method: &Method, mut res: Response) {
         match method {
             &Method::Get => {
                 let path = parse_uri(uri);
@@ -65,7 +66,11 @@ impl Flash {
                     }
                 }
             }
-            &Method::Post => {}
+            &Method::Post => {
+                let mut v:Vec<u8>=Vec::new();
+                req.read_to_end(&mut v);
+                println!("{:?}",v );
+            },
             _ => {
                 bad_request(res);
             }
@@ -75,14 +80,16 @@ impl Flash {
 
 }
 impl ::hyper::server::Handler for Flash {
-    fn handle<'a>(&self, req: Request, mut res: Response<'a,Fresh>) {
-        let (_, method, _, uri, _, _) = req.deconstruct();
+    fn handle<'a>(&self, mut req: Request, mut res: Response<'a,Fresh>) {
+        //let (_, method, _, uri, _, _) = req.deconstruct();
+        let method=req.method.clone();
+        let uri=req.uri.clone();
         match uri {
             AbsoluteUri(ref url) => {
                 println!("{:?}", url);
             }
             AbsolutePath(ref path) => {
-                self.dispatch(path, &method, res);
+                self.dispatch(&mut req,path, &method, res);
             }
             _ => {
                 bad_request(res);
@@ -92,7 +99,6 @@ impl ::hyper::server::Handler for Flash {
 }
 
 fn set_header<'a,'b>(mut res: Response<'a,Fresh>, file_path: &PathBuf) -> Response<'a,Fresh> {
-    res.headers_mut().set_raw("content-type", vec![b"text/css".to_vec()]);
     res.headers_mut()
        .set_raw("Cache-Control", vec![b"max-age=31536000, public".to_vec()]);
        let path=&file_path.to_string_lossy().into_owned();
@@ -112,6 +118,9 @@ fn set_header<'a,'b>(mut res: Response<'a,Fresh>, file_path: &PathBuf) -> Respon
     } else if v == "js" {
         res.headers_mut()
            .set_raw("content-type", vec![b"application/javascript".to_vec()]);
+    }else if v=="ico"{
+        res.headers_mut()
+           .set_raw("content-type", vec![b"image/x-icon".to_vec()]);
     }
     res
 }
