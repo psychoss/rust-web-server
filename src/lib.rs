@@ -1,5 +1,6 @@
 extern crate hyper;
 extern crate time;
+extern crate url;
 pub mod server;
 pub mod static_handler;
 //

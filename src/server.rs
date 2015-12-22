@@ -14,7 +14,7 @@ use std::env;
 use std::net::{ToSocketAddrs, SocketAddr};
 use std::path::PathBuf;
 use std::time::Duration;
-
+use url::{Url, ParseError};
 use static_handler::Handler as StaticHandler;
 
 
@@ -51,28 +51,7 @@ impl Flash {
                 file_path.push(&path);
                 match get_extension(&path) {
                     Some(v) => {
-                        res.headers_mut()
-                           .set_raw("Cache-Control", vec![b"max-age=31536000, public".to_vec()]);
-                        match fs::metadata(&file_path.to_string_lossy().into_owned()) {
-                            Ok(ref v) => {
-                                let tm = &time::at(Timespec::new(v.mtime() as i64,
-                                                                 v.mtime_nsec() as i32));
-                                let s = tm.to_utc().rfc822().to_string();
-
-                                res.headers_mut().set_raw("Date", vec![s.into_bytes().to_vec()]);
-
-                            }
-                            Err(err) => {
-                                println!("{:?}", err);
-                            }
-                        }
-
-                        if v == "css" {
-                            res.headers_mut().set_raw("content-type", vec![b"text/css".to_vec()]);
-                        } else if v == "js" {
-                            res.headers_mut()
-                               .set_raw("content-type", vec![b"application/javascript".to_vec()]);
-                        }
+                        res=set_header(res,&file_path);
                     }
                     None => {}
                 }
@@ -96,7 +75,7 @@ impl Flash {
 
 }
 impl ::hyper::server::Handler for Flash {
-    fn handle(&self, req: Request, mut res: Response<Fresh>) {
+    fn handle<'a>(&self, req: Request, mut res: Response<'a,Fresh>) {
         let (_, method, _, uri, _, _) = req.deconstruct();
         match uri {
             AbsoluteUri(ref url) => {
@@ -112,11 +91,37 @@ impl ::hyper::server::Handler for Flash {
     }
 }
 
+fn set_header<'a,'b>(mut res: Response<'a,Fresh>, file_path: &PathBuf) -> Response<'a,Fresh> {
+    res.headers_mut().set_raw("content-type", vec![b"text/css".to_vec()]);
+    res.headers_mut()
+       .set_raw("Cache-Control", vec![b"max-age=31536000, public".to_vec()]);
+       let path=&file_path.to_string_lossy().into_owned();
+    match fs::metadata(path) {
+        Ok(ref v) => {
+            let tm = &time::at(Timespec::new(v.mtime() as i64, v.mtime_nsec() as i32));
+            let s = tm.to_utc().rfc822().to_string();
+            res.headers_mut().set_raw("Date", vec![s.into_bytes().to_vec()]);
+        }
+        Err(err) => {
+            println!("{:?}", err);
+        }
+    }
+    let v = get_extension(path).unwrap();
+    if v == "css" {
+        res.headers_mut().set_raw("content-type", vec![b"text/css".to_vec()]);
+    } else if v == "js" {
+        res.headers_mut()
+           .set_raw("content-type", vec![b"application/javascript".to_vec()]);
+    }
+    res
+}
 fn get_extension(uri: &String) -> Option<&str> {
     uri.split(".").last()
 }
 
 fn parse_uri(uri: &String) -> String {
+
+    // println!("{:?}", Url::parse(uri).unwrap());
     let mut path = uri.clone();
     path.remove(0);
     if path.len() == 0 {

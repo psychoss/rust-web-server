@@ -7,6 +7,7 @@ authors = ["psychoss <626377748@qq.com>"]
 hyper="*"
 postgres="*"
 time = "*"
+url="*"
 [[bin]]
 name = "sever"
 path="src/bin/main.rs"
