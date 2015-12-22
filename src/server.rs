@@ -47,7 +47,7 @@ impl Flash {
         match method {
             &Method::Get => {
                 let path = parse_uri(uri);
-                let mut file_path=self.root.clone();
+                let mut file_path = self.root.clone();
                 file_path.push(&path);
                 match get_extension(&path) {
                     Some(v) => {
@@ -55,15 +55,15 @@ impl Flash {
                            .set_raw("Cache-Control", vec![b"max-age=31536000, public".to_vec()]);
                         match fs::metadata(&file_path.to_string_lossy().into_owned()) {
                             Ok(ref v) => {
-                                let tm=& time::at(Timespec::new(v.mtime() as i64, v.mtime_nsec() as i32));
-                                let s=  tm.to_utc().rfc822().to_string();
-                                 rintln!("{:?}",s );
+                                let tm = &time::at(Timespec::new(v.mtime() as i64,
+                                                                 v.mtime_nsec() as i32));
+                                let s = tm.to_utc().rfc822().to_string();
 
                                 res.headers_mut().set_raw("Date", vec![s.into_bytes().to_vec()]);
 
-                            },
+                            }
                             Err(err) => {
-                                println!("{:?}",err);
+                                println!("{:?}", err);
                             }
                         }
 
