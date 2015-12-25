@@ -17,6 +17,22 @@ use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::time::Duration;
 use time::{self, Timespec};
+use rustc_serialize::json::Json;
+use rustc_serialize::json::Object;
+use std::error::Error;
+
+use std::str;
+
+macro_rules! try_str {
+    ($e:expr) => {
+        match $e {
+            Ok(x) => x,
+            Err(e) => {
+                return Err(format!("{}", e));
+            }
+        }
+    }
+}
 
 pub struct Flash {
     address: Option<SocketAddr>,
@@ -43,7 +59,7 @@ impl Flash {
             root: root_path,
         }
     }
-    pub fn dispatch(&self, uri:&String ,req:&mut Request, mut res: Response) {
+    pub fn dispatch(&self, uri: &String, req: &mut Request, mut res: Response) {
         match &req.method {
             &Method::Get => {
                 let path = parse_uri(uri);
@@ -51,14 +67,14 @@ impl Flash {
                 file_path.push(&path);
                 match get_extension(&path) {
                     Some(v) => {
-                    set_header(&mut res,&file_path);
+                        set_header(&mut res, &file_path);
                     }
                     None => {}
                 }
 
                 match StaticHandler::handle(&file_path) {
                     Ok(ref v) => {
-                    res.send(v);
+                        res.send(v);
                     }
                     _ => {
                         bad_request(res);
@@ -66,10 +82,11 @@ impl Flash {
                 }
             }
             &Method::Post => {
-                let mut v:Vec<u8>=Vec::new();
+                let mut v: Vec<u8> = Vec::new();
                 req.read_to_end(&mut v);
-                println!("{:?}",v );
-            },
+
+                println!("{:?}", v);
+            }
             _ => {
                 bad_request(res);
             }
@@ -78,15 +95,25 @@ impl Flash {
 
 
 }
+fn read_json(buf: &Vec<u8>) -> Result<Json, String> {
+    let j = try_str!(str::from_utf8(buf));
+    let data = try_str!(Json::from_str(j));
+    Ok(data)
+    // let v = match data.as_object() {
+    //     Some(v) =>Ok(v),
+    //     None => Err("".to_string()),
+    // };
+
+}
 impl ::hyper::server::Handler for Flash {
-    fn handle<'a>(&self, mut req: Request, mut res: Response<'a,Fresh>) {
-        let uri=req.uri.clone();
+    fn handle<'a>(&self, mut req: Request, mut res: Response<'a, Fresh>) {
+        let uri = req.uri.clone();
         match uri {
             AbsoluteUri(ref url) => {
                 println!("{:?}", url);
             }
             AbsolutePath(ref path) => {
-                self.dispatch(path,&mut req,res);
+                self.dispatch(path, &mut req, res);
             }
             _ => {
                 bad_request(res);
@@ -95,10 +122,10 @@ impl ::hyper::server::Handler for Flash {
     }
 }
 
-fn set_header<'a,'b>(res:&mut  Response<'a,Fresh>, file_path: &PathBuf) {
+fn set_header<'a, 'b>(res: &mut Response<'a, Fresh>, file_path: &PathBuf) {
     res.headers_mut()
        .set_raw("Cache-Control", vec![b"max-age=31536000, public".to_vec()]);
-       let path=&file_path.to_string_lossy().into_owned();
+    let path = &file_path.to_string_lossy().into_owned();
     match fs::metadata(path) {
         Ok(ref v) => {
             let tm = &time::at(Timespec::new(v.mtime() as i64, v.mtime_nsec() as i32));
@@ -115,7 +142,7 @@ fn set_header<'a,'b>(res:&mut  Response<'a,Fresh>, file_path: &PathBuf) {
     } else if v == "js" {
         res.headers_mut()
            .set_raw("content-type", vec![b"application/javascript".to_vec()]);
-    }else if v=="ico"{
+    } else if v == "ico" {
         res.headers_mut()
            .set_raw("content-type", vec![b"image/x-icon".to_vec()]);
     }
