@@ -84,7 +84,15 @@ impl Flash {
             &Method::Post => {
                 let mut v: Vec<u8> = Vec::new();
                 req.read_to_end(&mut v);
-
+                match read_json(&v) {
+                    Ok(v) => {
+                        let j = v.as_object().unwrap();
+                        println!("{:?}", j);
+                    }
+                    Err(_) => {
+                        bad_request(res);
+                    }
+                }
                 println!("{:?}", v);
             }
             _ => {
@@ -95,7 +103,7 @@ impl Flash {
 
 
 }
-fn read_json(buf: &Vec<u8>) -> Result<Json,()> {
+fn read_json(buf: &Vec<u8>) -> Result<Json, ()> {
     let j = ok!(str::from_utf8(buf));
     let data = ok!(Json::from_str(j));
     Ok(data)
