@@ -1,4 +1,3 @@
-
 use hyper::Server as HttpServer;
 use hyper::error::Error as HttpError;
 use hyper::method::Method;
@@ -7,17 +6,17 @@ use hyper::server::request::Request;
 use hyper::server::response::Response;
 use hyper::status::StatusCode;
 use hyper::uri::RequestUri::{AbsoluteUri, AbsolutePath};
-use std::os::unix::fs::MetadataExt;
-use std::fs::{self, Metadata};
-use time::{self, Timespec};
+use static_handler::Handler as StaticHandler;
+use std::any::Any;
 use std::env;
+use std::fs::{self, Metadata};
+use std::io::Read;
+use std::marker;
 use std::net::{ToSocketAddrs, SocketAddr};
+use std::os::unix::fs::MetadataExt;
 use std::path::PathBuf;
 use std::time::Duration;
-use static_handler::Handler as StaticHandler;
-use std::io::Read;
-use std::any::Any;
-use std::marker;
+use time::{self, Timespec};
 
 pub struct Flash {
     address: Option<SocketAddr>,
@@ -44,22 +43,22 @@ impl Flash {
             root: root_path,
         }
     }
-    pub fn dispatch(&self,  req:&mut Request,uri: &String, method: &Method, mut res: Response) {
-        match method {
+    pub fn dispatch(&self, uri:&String ,req:&mut Request, mut res: Response) {
+        match &req.method {
             &Method::Get => {
                 let path = parse_uri(uri);
                 let mut file_path = self.root.clone();
                 file_path.push(&path);
                 match get_extension(&path) {
                     Some(v) => {
-                        res=set_header(res,&file_path);
+                    set_header(&mut res,&file_path);
                     }
                     None => {}
                 }
 
                 match StaticHandler::handle(&file_path) {
                     Ok(ref v) => {
-                        res.send(v);
+                    res.send(v);
                     }
                     _ => {
                         bad_request(res);
@@ -81,15 +80,13 @@ impl Flash {
 }
 impl ::hyper::server::Handler for Flash {
     fn handle<'a>(&self, mut req: Request, mut res: Response<'a,Fresh>) {
-        //let (_, method, _, uri, _, _) = req.deconstruct();
-        let method=req.method.clone();
         let uri=req.uri.clone();
         match uri {
             AbsoluteUri(ref url) => {
                 println!("{:?}", url);
             }
             AbsolutePath(ref path) => {
-                self.dispatch(&mut req,path, &method, res);
+                self.dispatch(path,&mut req,res);
             }
             _ => {
                 bad_request(res);
@@ -98,7 +95,7 @@ impl ::hyper::server::Handler for Flash {
     }
 }
 
-fn set_header<'a,'b>(mut res: Response<'a,Fresh>, file_path: &PathBuf) -> Response<'a,Fresh> {
+fn set_header<'a,'b>(res:&mut  Response<'a,Fresh>, file_path: &PathBuf) {
     res.headers_mut()
        .set_raw("Cache-Control", vec![b"max-age=31536000, public".to_vec()]);
        let path=&file_path.to_string_lossy().into_owned();
@@ -122,7 +119,6 @@ fn set_header<'a,'b>(mut res: Response<'a,Fresh>, file_path: &PathBuf) -> Respon
         res.headers_mut()
            .set_raw("content-type", vec![b"image/x-icon".to_vec()]);
     }
-    res
 }
 fn get_extension(uri: &String) -> Option<&str> {
     uri.split(".").last()
