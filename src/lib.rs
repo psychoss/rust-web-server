@@ -1,6 +1,7 @@
 extern crate hyper;
 extern crate time;
-extern crate url;
+extern crate rustc_serialize;
+
 pub mod server;
 pub mod static_handler;
 //
