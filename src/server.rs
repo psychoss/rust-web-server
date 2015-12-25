@@ -23,17 +23,17 @@ use std::error::Error;
 
 use std::str;
 
-macro_rules! try_str {
+
+macro_rules! ok {
     ($e:expr) => {
         match $e {
             Ok(x) => x,
-            Err(e) => {
-                return Err(format!("{}", e));
+            Err(_) => {
+                return Err(());
             }
         }
     }
 }
-
 pub struct Flash {
     address: Option<SocketAddr>,
     root: PathBuf,
@@ -95,9 +95,9 @@ impl Flash {
 
 
 }
-fn read_json(buf: &Vec<u8>) -> Result<Json, String> {
-    let j = try_str!(str::from_utf8(buf));
-    let data = try_str!(Json::from_str(j));
+fn read_json(buf: &Vec<u8>) -> Result<Json,()> {
+    let j = ok!(str::from_utf8(buf));
+    let data = ok!(Json::from_str(j));
     Ok(data)
     // let v = match data.as_object() {
     //     Some(v) =>Ok(v),
