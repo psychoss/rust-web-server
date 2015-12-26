@@ -21,5 +21,8 @@ function signin() {
 }
 
 $(document).ready(function() {
+  $.post("/",JSON.stringify({
+    item:1
+  }))
   bindSignin();
 })

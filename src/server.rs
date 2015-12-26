@@ -71,25 +71,27 @@ impl Flash {
                     }
                     None => {}
                 }
-
-                match StaticHandler::handle(&file_path) {
-                    Ok(ref v) => {
-                        res.send(v);
-                    }
-                    _ => {
-                        bad_request(res);
-                    }
-                }
+                StaticHandler.handle(&file_path, res);
+                // match StaticHandler::handle(&file_path) {
+                //     Ok(ref v) => {
+                //         res.send(v);
+                //     }
+                //     _ => {
+                //         bad_request(res);
+                //     }
+                // }
             }
             &Method::Post => {
                 let mut v: Vec<u8> = Vec::new();
                 req.read_to_end(&mut v);
                 match read_json(&v) {
                     Ok(v) => {
-                        let j = v.as_object().unwrap();
+                        println!("Parse Json");
+                        let j = v.as_object().unwrap().get("item").unwrap();
                         println!("{:?}", j);
                     }
                     Err(_) => {
+                        println!("Parse Json Error");
                         bad_request(res);
                     }
                 }
@@ -100,11 +102,10 @@ impl Flash {
             }
         }
     }
-
-
 }
 fn read_json(buf: &Vec<u8>) -> Result<Json, ()> {
     let j = ok!(str::from_utf8(buf));
+    println!("{:?}", j);
     let data = ok!(Json::from_str(j));
     Ok(data)
     // let v = match data.as_object() {
@@ -130,7 +131,7 @@ impl ::hyper::server::Handler for Flash {
     }
 }
 
-fn set_header<'a, 'b>(res: &mut Response<'a, Fresh>, file_path: &PathBuf) {
+fn set_header(res: &mut Response<Fresh>, file_path: &PathBuf) {
     res.headers_mut()
        .set_raw("Cache-Control", vec![b"max-age=31536000, public".to_vec()]);
     let path = &file_path.to_string_lossy().into_owned();
@@ -152,7 +153,7 @@ fn set_header<'a, 'b>(res: &mut Response<'a, Fresh>, file_path: &PathBuf) {
            .set_raw("content-type", vec![b"application/javascript".to_vec()]);
     } else if v == "ico" {
         res.headers_mut()
-           .set_raw("content-type", vec![b"image/x-icon".to_vec()]);
+           .set_raw("content-type", vec!["image/x-icon".as_bytes().to_vec()]);
     }
 }
 fn get_extension(uri: &String) -> Option<&str> {
