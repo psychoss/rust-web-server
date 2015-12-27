@@ -4,6 +4,7 @@ extern crate rustc_serialize;
 
 #[macro_use]mod macros;
 
+mod headers;
 pub mod mime;
 pub mod server;
 pub mod static_handler;

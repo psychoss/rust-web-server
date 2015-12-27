@@ -1,7 +1,7 @@
 
 use std::fs::File;
 use std::io::prelude::*;
-use std::path::{PathBuf, Path};
+use std::path::Path;
 
 use mime::MediaType;
 use hyper::server::response::Response;
@@ -27,9 +27,9 @@ impl Handler {
             match File::open(p) {
                 Ok(ref mut file) => {
                     let mut v: Vec<u8> = Vec::new();
-                    file.read_to_end(&mut v);
+                    let _ = file.read_to_end(&mut v);
                     self.set_header(&mut res, p);
-                    res.send(&v);
+                    let _ = res.send(&v);
                 }
                 Err(_) => {
                     failed!(res, StatusCode::BadRequest);

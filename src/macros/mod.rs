@@ -5,10 +5,22 @@ macro_rules! failed {
     *($r).status_mut() = $c;
     match $r.start(){
         Ok(v)=>{
-            v.end();
-            println!("end");
+           let _= v.end();
+            
         }
         _=>{}
     }
 }
+}
+
+#[macro_export]
+macro_rules! ok {
+    ($e:expr) => {
+        match $e {
+            Ok(x) => x,
+            Err(_) => {
+                return Err(());
+            }
+        }
+    }
 }

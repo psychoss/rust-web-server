@@ -1,3 +1,4 @@
+use headers::Headers;
 use hyper::Server as HttpServer;
 use hyper::error::Error as HttpError;
 use hyper::method::Method;
@@ -6,36 +7,17 @@ use hyper::server::request::Request;
 use hyper::server::response::Response;
 use hyper::status::StatusCode;
 use hyper::uri::RequestUri::{AbsoluteUri, AbsolutePath};
+
 use static_handler::Handler as StaticHandler;
-use std::any::Any;
 use std::env;
-use std::fs::{self, Metadata};
 use std::io::Read;
-use std::marker;
-use std::net::{ToSocketAddrs, SocketAddr};
-use std::os::unix::fs::MetadataExt;
+use std::net::ToSocketAddrs;
 use std::path::PathBuf;
-use std::time::Duration;
-use time::{self, Timespec};
-use rustc_serialize::json::Json;
-use rustc_serialize::json::Object;
-use std::error::Error;
-
 use std::str;
+use std::time::Duration;
 
 
-macro_rules! ok {
-    ($e:expr) => {
-        match $e {
-            Ok(x) => x,
-            Err(_) => {
-                return Err(());
-            }
-        }
-    }
-}
 pub struct Flash {
-    address: Option<SocketAddr>,
     root: PathBuf,
 }
 
@@ -48,16 +30,13 @@ impl Flash {
         let mut flash = try!(HttpServer::http(sock_addr));
         // Set the keep_alive
         flash.keep_alive(Some(Duration::new(1, 0)));
-        flash.handle(self);
+        let _ = flash.handle(self);
         Ok(())
     }
     pub fn new() -> Flash {
         let mut root_path = env::current_dir().unwrap();
         root_path.push("static");
-        Flash {
-            address: None,
-            root: root_path,
-        }
+        Flash { root: root_path }
     }
     pub fn dispatch(&self, uri: &String, req: &mut Request, mut res: Response) {
         match &req.method {
@@ -66,54 +45,39 @@ impl Flash {
                 let mut file_path = self.root.clone();
                 file_path.push(&path);
                 match get_extension(&path) {
-                    Some(v) => {
-                        set_header(&mut res, &file_path);
+                    Some(_) => {
+                        Headers::set_headers(&mut res, &file_path);
                     }
                     None => {}
                 }
                 StaticHandler.handle(&file_path, res);
-                // match StaticHandler::handle(&file_path) {
-                //     Ok(ref v) => {
-                //         res.send(v);
-                //     }
-                //     _ => {
-                //         bad_request(res);
-                //     }
-                // }
+
             }
             &Method::Post => {
                 let mut v: Vec<u8> = Vec::new();
-                req.read_to_end(&mut v);
-                match read_json(&v) {
-                    Ok(v) => {
-                        println!("Parse Json");
-                        let j = v.as_object().unwrap().get("item").unwrap();
-                        println!("{:?}", j);
-                    }
-                    Err(_) => {
-                        println!("Parse Json Error");
-                        bad_request(res);
-                    }
-                }
+                let _ = req.read_to_end(&mut v);
+                // match read_json(&v) {
+                //     Ok(v) => {
+                //         println!("Parse Json");
+                //         let j = v.as_object().unwrap().get("item").unwrap();
+                //         println!("{:?}", j);
+                //     }
+                //     Err(_) => {
+                //         println!("Parse Json Error");
+                //         failed!(res, StatusCode::BadRequest);
+
+                //     }
+                // }
                 println!("{:?}", v);
             }
             _ => {
-                bad_request(res);
+                failed!(res, StatusCode::BadRequest);
+
             }
         }
     }
 }
-fn read_json(buf: &Vec<u8>) -> Result<Json, ()> {
-    let j = ok!(str::from_utf8(buf));
-    println!("{:?}", j);
-    let data = ok!(Json::from_str(j));
-    Ok(data)
-    // let v = match data.as_object() {
-    //     Some(v) =>Ok(v),
-    //     None => Err("".to_string()),
-    // };
 
-}
 impl ::hyper::server::Handler for Flash {
     fn handle<'a>(&self, mut req: Request, mut res: Response<'a, Fresh>) {
         let uri = req.uri.clone();
@@ -125,37 +89,14 @@ impl ::hyper::server::Handler for Flash {
                 self.dispatch(path, &mut req, res);
             }
             _ => {
-                bad_request(res);
+                failed!(res, StatusCode::BadRequest);
+
             }
         }
     }
 }
 
-fn set_header(res: &mut Response<Fresh>, file_path: &PathBuf) {
-    res.headers_mut()
-       .set_raw("Cache-Control", vec![b"max-age=31536000, public".to_vec()]);
-    let path = &file_path.to_string_lossy().into_owned();
-    match fs::metadata(path) {
-        Ok(ref v) => {
-            let tm = &time::at(Timespec::new(v.mtime() as i64, v.mtime_nsec() as i32));
-            let s = tm.to_utc().rfc822().to_string();
-            res.headers_mut().set_raw("Date", vec![s.into_bytes().to_vec()]);
-        }
-        Err(err) => {
-            println!("{:?}", err);
-        }
-    }
-    let v = get_extension(path).unwrap();
-    if v == "css" {
-        res.headers_mut().set_raw("content-type", vec![b"text/css".to_vec()]);
-    } else if v == "js" {
-        res.headers_mut()
-           .set_raw("content-type", vec![b"application/javascript".to_vec()]);
-    } else if v == "ico" {
-        res.headers_mut()
-           .set_raw("content-type", vec!["image/x-icon".as_bytes().to_vec()]);
-    }
-}
+
 fn get_extension(uri: &String) -> Option<&str> {
     uri.split(".").last()
 }
@@ -169,12 +110,4 @@ fn parse_uri(uri: &String) -> String {
         path.push_str("index.html");
     }
     path
-}
-
-fn bad_request(mut res: Response<Fresh>) {
-    *res.status_mut() = StatusCode::BadRequest;
-
-    if let Ok(res) = res.start() {
-        let _ = res.end();
-    }
 }
