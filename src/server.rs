@@ -9,13 +9,13 @@ use hyper::status::StatusCode;
 use hyper::uri::RequestUri::{AbsoluteUri, AbsolutePath};
 
 use static_handler::Handler as StaticHandler;
-use std::env;
 use std::io::Read;
 use std::net::ToSocketAddrs;
 use std::path::PathBuf;
 use std::str;
 use std::time::Duration;
 
+use util;
 
 pub struct Flash {
     root: PathBuf,
@@ -28,15 +28,13 @@ impl Flash {
                             .and_then(|mut addrs| addrs.next())
                             .expect("Could not parse socket address.");
         let mut flash = try!(HttpServer::http(sock_addr));
-        // Set the keep_alive
         flash.keep_alive(Some(Duration::new(1, 0)));
         let _ = flash.handle(self);
         Ok(())
     }
-    pub fn new() -> Flash {
-        let mut root_path = env::current_dir().unwrap();
-        root_path.push("static");
-        Flash { root: root_path }
+    pub fn new(p: PathBuf) -> Flash {
+
+        Flash { root: p }
     }
     pub fn dispatch(&self, uri: &String, req: &mut Request, mut res: Response) {
         match &req.method {
@@ -44,7 +42,7 @@ impl Flash {
                 let path = parse_uri(uri);
                 let mut file_path = self.root.clone();
                 file_path.push(&path);
-                match get_extension(&path) {
+                match util::get_extension(&path) {
                     Some(_) => {
                         Headers::set_headers(&mut res, &file_path);
                     }
@@ -97,9 +95,6 @@ impl ::hyper::server::Handler for Flash {
 }
 
 
-fn get_extension(uri: &String) -> Option<&str> {
-    uri.split(".").last()
-}
 
 fn parse_uri(uri: &String) -> String {
 
